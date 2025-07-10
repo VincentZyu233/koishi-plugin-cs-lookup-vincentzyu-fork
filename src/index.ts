@@ -12,9 +12,10 @@ export const inject = ['puppeteer', 'database', 'umamiStatisticsService'];
 
 export interface Config {
   data_collect: boolean,
-  theme: boolean,
   useSteamAPI: boolean,
   SteamWebAPIKey: string,
+  theme: boolean,
+  imageQuality: number,
   proxyAddr: string,
   userAgent: string,
   cookie: string,
@@ -25,15 +26,21 @@ export const Config: Schema<Config> = Schema.intersect([
     data_collect: Schema.boolean()
       .default(true)
       .description('是否允许匿名数据收集 隐私政策见上方链接'),
-    theme: Schema.boolean()
-      .default(false)
-      .description('使用浅色主题'),
     useSteamAPI: Schema.boolean()
       .default(true)
       .description("是否使用Steam官方API查询 (大陆地区实例可能存在网络不佳情况)"),
     SteamWebAPIKey: Schema.string()
       .description("Steam Web API Key from www.steamwebapi.com"),
   }).description("基础设置"),
+  Schema.object({
+    theme: Schema.boolean()
+      .default(false)
+      .description('使用浅色主题'),
+    imageQuality: Schema.number()
+      .default(10)
+      .min(0).max(100).step(0.1)
+      .role('slider'),
+  }).description("puppeteer网页截图配置"),
   Schema.object({
     proxyAddr: Schema.string()
       .default("socks5h://192.168.31.84:7891")

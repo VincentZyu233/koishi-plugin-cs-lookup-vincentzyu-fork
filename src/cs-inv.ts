@@ -30,6 +30,9 @@ export function inv(ctx: Context, config: Config) {
   const umamiD = umami;
   ctx.command('cs-inv [steamId]', '查看CS背包', { authority: 0 })
     .action(async ({ session }, steamId) => {
+
+      const waitMsgId = await session.send(`调用cs-inv!, steamId = ${steamId}\n\t 获取inv+渲染中....`);
+
       if (config.data_collect) {
         ctx.umamiStatisticsService.send({
           dataHostUrl: umamiD[1],
@@ -80,9 +83,9 @@ export function inv(ctx: Context, config: Config) {
           for (const [itemName, itemInfo] of itemMap.entries()) {
             cardHtml += `
             <div class="col-4 flex flex-col h-full w-full min-w-[250px] max-w-[350px]">
-              <div class="bg-[${current[2]}] shadow-lg rounded-2xl p-4 flex flex-col justify-between h-full">
-                <h2 class="text-lg font-semibold mb-2 flex-grow break-words text-[${current[1]}] mb-5">${itemName}</h2>
-                <img src="${itemInfo.imageUrl}" alt="${itemName}" style="width:80%;">
+              <div class="bg-[${current[2]}] shadow-2xl rounded-2xl p-4 flex flex-col justify-between h-full">
+                <h2 class="text-base font-semibold mb-2 flex-grow break-words text-[${current[1]}] mb-5">${itemName}</h2>
+                <img src="${itemInfo.imageUrl}" alt="${itemName}" style="width:90%;">
               </div>
             </div>
           `;
@@ -91,7 +94,8 @@ export function inv(ctx: Context, config: Config) {
           const totalStr = `总物品数: ${totalItemCount}`;
           const html = generateHtml(cardHtml, totalStr, steamId, profData.personaname, config.theme);
           const image = await ctx.puppeteer.render(html);
-          return image;
+          // return image;
+          await session.send(image);
         } catch (e) {
           let errMsg = `出现错误, 请检查该用户库存是否公开或者网络连接是否正常. err: ${e}`;
           ctx.logger('cs-lookup').error(errMsg);
@@ -105,7 +109,6 @@ export function inv(ctx: Context, config: Config) {
         }
         const invUrl = `https://steamcommunity.com/inventory/${steamId}/730/2?l=schinese`
         try {
-          await session.send(`cs-inv!, steamId = ${steamId}`);
           // const invData = await ctx.http.get(invUrl);
 
           const invRes = await axiosWithProxy.get(
@@ -144,9 +147,9 @@ export function inv(ctx: Context, config: Config) {
           for (const [itemName, itemInfo] of itemMap.entries()) {
             cardHtml += `
             <div class="col-4 flex flex-col h-full w-full min-w-[250px] max-w-[350px]">
-              <div class="bg-[${current[2]}] shadow-lg rounded-2xl p-4 flex flex-col justify-between h-full">
-                <h2 class="text-lg font-semibold mb-2 flex-grow break-words text-[${current[1]}] mb-5">${itemName}</h2>
-                <img src="${itemInfo.imageUrl}" alt="${itemName}" style="width:80%;">
+              <div class="bg-[${current[2]}] shadow-2xl rounded-2xl p-4 flex flex-col justify-between h-full">
+                <h2 class="text-base font-semibold mb-2 flex-grow break-words text-[${current[1]}] mb-5">${itemName}</h2>
+                <img src="${itemInfo.imageUrl}" alt="${itemName}" style="width:90%;">
               </div>
             </div>
           `;
@@ -154,13 +157,35 @@ export function inv(ctx: Context, config: Config) {
 
           const totalStr = `总物品数: ${invData.total_inventory_count}`;
           const html = generateHtml(cardHtml, totalStr, steamId, '', config.theme);
-          const image = await ctx.puppeteer.render(html);
-          return image
+          // const image = await ctx.puppeteer.render(html);
+          // return image;
+          // await session.send(image);
+          const invPage = await ctx.puppeteer.page();
+          await invPage.setContent(html);
+
+          const invImageRes = await invPage.screenshot(
+            {
+              encoding: 'base64',
+              type: 'jpeg',
+              omitBackground: true,
+              fullPage: true,
+              quality: config.imageQuality
+            }
+          )
+          await session.send( h.image(`data:image/png;base64,${invImageRes}`) );
+
         } catch (e) {
           ctx.logger('cs-lookup').error(e)
           return "出现错误, 请检查该用户库存是否公开或者与SteamAPI的连接是否正常"
         }
       }
+
+      try{
+        await session.bot.deleteMessage(session.guildId, String(waitMsgId));
+      } catch(err){
+        ctx.logger.info(`消息撤回失败，有可能是过太久了导致qq无法撤回。 err: ${err}`)
+      }
+
     })
 }
 
@@ -177,13 +202,13 @@ export function generateHtml(cardHTML, totalStr, steamId, steamName, theme: bool
     <div class="max-w-7xl mx-auto p-4">
     
       <div class="text-center mb-5">
-        <div class="bg-[${current[2]}] shadow-lg rounded-2xl py-4 px-6">
-          <p class="text-2xl font-bold text-[${current[1]}]">CS 库存查询 - ${steamName}(${steamId})</p>
+        <div class="bg-[${current[2]}] shadow-2xl rounded-2xl py-4 px-6">
+          <p class="text-3xl font-bold text-[${current[1]}]">CS 库存查询 - ${steamName}(${steamId})</p>
           <div class="text-sm">${totalStr}</div>
         </div>
       </div>
     
-      <div class="grid grid-cols-4 gap-3">
+      <div class="grid grid-cols-5 gap-3">
         ${cardHTML}
       </div>
     </div>
