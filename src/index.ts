@@ -14,15 +14,40 @@ export interface Config {
   data_collect: boolean,
   theme: boolean,
   useSteamAPI: boolean,
-  SteamWebAPIKey: string
+  SteamWebAPIKey: string,
+  proxyAddr: string,
+  userAgent: string,
+  cookie: string,
 }
 
-export const Config: Schema<Config> = Schema.object({
-  data_collect: Schema.boolean().default(true).description('是否允许匿名数据收集 隐私政策见上方链接'),
-  theme: Schema.boolean().default(false).description('使用浅色主题'),
-  useSteamAPI: Schema.boolean().default(true).description("是否使用Steam官方API查询 (大陆地区实例可能存在网络不佳情况)"),
-  SteamWebAPIKey: Schema.string().description("Steam Web API Key from www.steamwebapi.com"),
-})
+export const Config: Schema<Config> = Schema.intersect([
+  Schema.object({
+    data_collect: Schema.boolean()
+      .default(true)
+      .description('是否允许匿名数据收集 隐私政策见上方链接'),
+    theme: Schema.boolean()
+      .default(false)
+      .description('使用浅色主题'),
+    useSteamAPI: Schema.boolean()
+      .default(true)
+      .description("是否使用Steam官方API查询 (大陆地区实例可能存在网络不佳情况)"),
+    SteamWebAPIKey: Schema.string()
+      .description("Steam Web API Key from www.steamwebapi.com"),
+  }).description("基础设置"),
+  Schema.object({
+    proxyAddr: Schema.string()
+      .default("socks5h://192.168.31.84:7891")
+      .description("格式是为以下三者之一(仅测试过clash-cli+socks5 awa): \n\t(1)socks5h://ip:port \n\t(2)http://ip:port \n\t(3)https://ip:port")
+      .role('link'),
+    userAgent: Schema.string()
+      .description("chrome打开chrome://version页面，找到用户代理")
+      .role('textarea', { rows: [2, 10] }),
+    cookie: Schema.string()
+      .description("浏览器访问https://steamcommunity.com/inventory/76561198307564265/730/2?l=schinese，然后F12打开Network，找到这个请求的cookie填入")
+      .role('textarea', { rows: [2, 10] }),
+  }).description("代理配置")
+])
+
 
 export const usage = `
 ## 如遇使用问题可以前往QQ群: 957500313 讨论

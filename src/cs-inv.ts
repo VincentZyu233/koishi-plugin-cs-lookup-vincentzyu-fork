@@ -1,7 +1,11 @@
-import { Context } from 'koishi'
+import { Context, h } from 'koishi'
 import { Config, umami } from './index'
 import { } from 'koishi-plugin-puppeteer'
 import { } from 'koishi-plugin-umami-statistics-service'
+
+import axios from 'axios'
+import { SocksProxyAgent } from 'socks-proxy-agent'
+
 
 export const light = ['#81a1c1', '#ffffff', '#5e81ac']
 export const dark = ['#2e3440', '#ffffff', '#434c5e']
@@ -11,6 +15,18 @@ export function isOnlyDigits(str: string): boolean {
 }
 
 export function inv(ctx: Context, config: Config) {
+  const agent = new SocksProxyAgent(config.proxyAddr);
+
+  const axiosWithProxy = axios.create({
+    httpAgent: agent,
+    httpsAgent: agent,
+    timeout: 15000,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
+      'Accept': 'application/json'
+    }
+  })
+
   const umamiD = umami;
   ctx.command('cs-inv [steamId]', '查看CS背包', { authority: 0 })
     .action(async ({ session }, steamId) => {
@@ -34,6 +50,7 @@ export function inv(ctx: Context, config: Config) {
         }
       }
       if (!config.useSteamAPI) {
+        //不使用steam API
         if (steamId.startsWith("https://steamcommunity.com/")) {
           const profUrl = `https://www.steamwebapi.com/steam/api/profile?key=${config.SteamWebAPIKey}&id=${steamId}`;
           const data = await ctx.http.get(profUrl);
@@ -65,7 +82,7 @@ export function inv(ctx: Context, config: Config) {
             <div class="col-4 flex flex-col h-full w-full min-w-[250px] max-w-[350px]">
               <div class="bg-[${current[2]}] shadow-lg rounded-2xl p-4 flex flex-col justify-between h-full">
                 <h2 class="text-lg font-semibold mb-2 flex-grow break-words text-[${current[1]}] mb-5">${itemName}</h2>
-                <img src="${itemInfo.imageUrl}" alt="${itemName}" style="width:20%;">
+                <img src="${itemInfo.imageUrl}" alt="${itemName}" style="width:80%;">
               </div>
             </div>
           `;
@@ -76,16 +93,40 @@ export function inv(ctx: Context, config: Config) {
           const image = await ctx.puppeteer.render(html);
           return image;
         } catch (e) {
-          ctx.logger('cs-lookup').error(e)
-          return "出现错误, 请检查该用户库存是否公开或者网络连接是否正常"
+          let errMsg = `出现错误, 请检查该用户库存是否公开或者网络连接是否正常. err: ${e}`;
+          ctx.logger('cs-lookup').error(errMsg);
+          await session.send(h.quote(session.messageId) + errMsg);          
+          return;
         }
       } else {
+        //使用Steam API
         if (!isOnlyDigits(steamId)) {
           return "无效steamID, 若不知道steamID请使用指令 `getid Steam个人资料页链接` 获取";
         }
         const invUrl = `https://steamcommunity.com/inventory/${steamId}/730/2?l=schinese`
         try {
-          const invData = await ctx.http.get(invUrl);
+          await session.send(`cs-inv!, steamId = ${steamId}`);
+          // const invData = await ctx.http.get(invUrl);
+
+          const invRes = await axiosWithProxy.get(
+            invUrl,
+            {
+              headers: {
+                'User-Agent': config.userAgent,
+                'Accept': 'application/json',
+                'Cookie': config.cookie
+              }
+            }
+          );
+          const invData = invRes.data;
+
+          // const page = ctx.puppeteer.page();
+          // await (await page).goto(invUrl, {waitUntil: 'networkidle2'});
+          // const invData = await (await page).evaluate(() => JSON.parse(document.body.innerText));
+          // (await page).close();
+
+          ctx.logger.info(`[debug] invData = ${JSON.stringify(invData).slice(0,300)}[end]`);
+
           const itemMap = new Map<string, { count: number, imageUrl: string }>();
 
           for (const item of invData.descriptions) {
@@ -105,7 +146,7 @@ export function inv(ctx: Context, config: Config) {
             <div class="col-4 flex flex-col h-full w-full min-w-[250px] max-w-[350px]">
               <div class="bg-[${current[2]}] shadow-lg rounded-2xl p-4 flex flex-col justify-between h-full">
                 <h2 class="text-lg font-semibold mb-2 flex-grow break-words text-[${current[1]}] mb-5">${itemName}</h2>
-                <img src="${itemInfo.imageUrl}" alt="${itemName}" style="width:20%;">
+                <img src="${itemInfo.imageUrl}" alt="${itemName}" style="width:80%;">
               </div>
             </div>
           `;
