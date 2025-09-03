@@ -23,6 +23,10 @@ export const Config = Schema.intersect([
     enableDarkTheme: Schema.boolean()
       .default(true)
       .description('使用深色主题'),
+    gridColumns: Schema.number()
+      .default(5)
+      .min(2).max(10).step(1)
+      .description("库存物品的列数"),
     imageQuality: Schema.number()
       .default(10)
       .min(0).max(100).step(0.1)

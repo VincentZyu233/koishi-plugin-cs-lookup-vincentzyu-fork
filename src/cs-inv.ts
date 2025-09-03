@@ -8,7 +8,7 @@ export function isOnlyDigits(str: string): boolean {
   return /^\d+$/.test(str);
 }
 
-export const light = ['#81a1c1', '#ffffff', '#5e81ac'];
+export const light = ['#81a1c1', '#2e3440', '#5e81ac']; // Changed font color to a dark gray
 export const dark = ['#2e3440', '#ffffff', '#434c5e'];
 
 export function inv(ctx: Context, config: any) {
@@ -64,6 +64,8 @@ export function inv(ctx: Context, config: any) {
       }
       const playerUrl = `https://us-cc.vincentzyu233.cn/fastapi_wrap/cs/player/${STEAMID}`;
       const invUrl = `https://us-cc.vincentzyu233.cn/fastapi_wrap/cs/inv/${STEAMID}`;
+      const currentColorArr = config.enableDarkTheme ? dark : light;
+
 
       try {
         const userRes = await axiosWithProxy.get(playerUrl);
@@ -80,18 +82,23 @@ export function inv(ctx: Context, config: any) {
         ctx.logger.info(`[debug] invData = ${JSON.stringify(invData).slice(0, 1000)}[end]`);
 
         let cardHtml = ``;
+        let gridColumns = config.gridColumns || 4;
         let totalStr = '';
+        let pageHeight = 500;
 
         if (!invData.descriptions || invData.descriptions.length === 0) {
           // 如果没有库存，显示一个醒目的提示
+          ctx.logger.info(`invData没有descriptions字段。`);
+          gridColumns = 1;
           totalStr = `总物品数: 0`;
           cardHtml = `
-            <div style="text-align: center; padding: 50px; font-size: 24px; font-weight: bold; color: #ff0000; background-color: rgba(255, 255, 255, 0.15); border-radius: 20px;">该用户没有CS2库存</div>
+            <div style="text-align: center; padding: 50px; font-size: 24px; font-weight: bold; color: ${currentColorArr[1]}; background-color: rgba(255, 255, 255, 0.15); border-radius: 20px;">该用户没有CS2库存</div>
           `;
+          pageHeight = 500;
         } else {
           // 否则，正常处理库存数据
+          ctx.logger.info(`invData有有descriptions字段。`);
           const itemMap = new Map<string, { count: number, imageUrl: string }>();
-
           for (const item of invData.descriptions) {
             const itemName = item.market_name;
             const imageUrl = "https://community.cloudflare.steamstatic.com/economy/image/" + item.icon_url;
@@ -114,16 +121,17 @@ export function inv(ctx: Context, config: any) {
           }
 
           totalStr = `总物品数: ${invData.total_inventory_count}`;
+          // 动态计算高度，每行4个卡片，每个卡片高度约300px，加上padding
+          const rowCount = Math.ceil(itemMap.size / 4);
+          pageHeight = rowCount * 300 + 200;
         }
 
-        const html = generateHtml(cardHtml, totalStr, STEAMID, playerPersonName, proxiedPlayerAvatarFullUrl, playerLastLogoffTimeStr, config.enableDarkTheme);
+        const html = generateHtml(cardHtml, gridColumns, totalStr, STEAMID, playerPersonName, proxiedPlayerAvatarFullUrl, playerLastLogoffTimeStr, config.enableDarkTheme);
         const invPage = await ctx.puppeteer.page();
         await invPage.setContent(html);
-        await invPage.waitForSelector('.main-card'); // 等待主卡片渲染完成
+        await invPage.waitForSelector('.main-card');
 
-        // 根据是否有库存来调整视口高度
-        const pageHeight = invData.descriptions && invData.descriptions.length > 0 ? invData.descriptions.length * 50 : 500;
-        await invPage.setViewport({ width: 1920, height: pageHeight });
+        await invPage.setViewport({ width: 1666, height: pageHeight });
 
         const invImageRes = await invPage.screenshot({
           encoding: 'base64',
@@ -136,10 +144,46 @@ export function inv(ctx: Context, config: any) {
         await session.send(`${h.quote(session.messageId)}查询结果:${h.image(invImageBase64)}`);
 
       } catch (e) {
-        const errMsg = `出现错误, 请检查该用户库存是否公开或者与SteamAPI的连接是否正常. err = ${e}`;
-        ctx.logger.error(errMsg);
-        await session.send(`${h.quote(session.messageId)}${errMsg}`);
-        return;
+        let cardHtml = '';
+        let errorMessage = "发生未知错误";
+
+        if (e.response && e.response.data && e.response.data.detail) {
+          const detail = e.response.data.detail;
+          if (detail.includes('Unauthorized')) {
+            errorMessage = `获取CS2库存失败，可能是对方未公开库存。`;
+          }
+          errorMessage += `<br/><br/>**原文:** ${detail}`;
+        }
+        
+        cardHtml = `
+            <div style="text-align: center; padding: 50px; font-size: 20px; font-weight: bold; color: ${currentColorArr[1]}; background-color: rgba(255, 255, 255, 0.15); border-radius: 20px;">
+                ${errorMessage}
+            </div>
+        `;
+
+        const userRes = await axiosWithProxy.get(playerUrl);
+        const playerAvatarFullUrl = userRes?.data?.response?.players[0]?.avatarfull;
+        const proxiedPlayerAvatarFullUrl = `https://us-cc.vincentzyu233.cn/fastapi_wrap/image_proxy?url=${playerAvatarFullUrl}`;
+        const playerPersonName = userRes?.data?.response?.players[0]?.personaname;
+        const playerLastLogoff = userRes?.data?.response?.players[0]?.lastlogoff;
+        const playerLastLogoffTimeStr = (new Date(playerLastLogoff * 1000)).toLocaleString();
+
+        const html = generateHtml(cardHtml, 1, '总物品数: ??', STEAMID, playerPersonName, proxiedPlayerAvatarFullUrl, playerLastLogoffTimeStr, config.enableDarkTheme);
+        const invPage = await ctx.puppeteer.page();
+        await invPage.setContent(html);
+        await invPage.waitForSelector('.main-card');
+        await invPage.setViewport({ width: 1666, height: 500 }); // fixed height for error page
+
+        const invImageRes = await invPage.screenshot({
+          encoding: 'base64',
+          type: 'jpeg',
+          omitBackground: true,
+          fullPage: true,
+          quality: config.imageQuality
+        });
+        const invImageBase64 = `data:image/png;base64,${invImageRes}`;
+        await session.send(`${h.quote(session.messageId)}查询结果:${h.image(invImageBase64)}`);
+        
       } finally {
         try {
           await session.bot.deleteMessage(session.guildId, String(waitMsgId));
@@ -151,10 +195,11 @@ export function inv(ctx: Context, config: any) {
     });
 }
 
-export function generateHtml(cardHTML, totalStr, steamId, steamName, playerAvatarUrl, playerLastLogoffTimeStr, theme: boolean): string {
+export function generateHtml(cardHTML, grid_columns: number, totalStr, steamId, steamName, playerAvatarUrl, playerLastLogoffTimeStr, theme: boolean): string {
   const current = theme ? dark : light;
   const opacity = theme ? '0.2' : '0.7';
   const backgroundColor = theme ? '#000000' : '#ffffff';
+  const fontColor = theme ? '#ffffff' : '#2e3440'; // Use a different variable for font color
 
   return `
     <head>
@@ -166,7 +211,7 @@ export function generateHtml(cardHTML, totalStr, steamId, steamName, playerAvata
         body {
           font-family: 'Noto Sans SC', sans-serif;
           background-color: ${current[0]};
-          color: ${current[1]};
+          color: ${fontColor};
           margin: 0;
           padding: 0;
           display: flex;
@@ -184,7 +229,7 @@ export function generateHtml(cardHTML, totalStr, steamId, steamName, playerAvata
           background-image: url('${playerAvatarUrl}');
           background-size: cover;
           background-position: center;
-          filter: blur(50px);
+          filter: blur(30px);
           z-index: -1;
           opacity: ${opacity};
           background-blend-mode: overlay;
@@ -224,23 +269,23 @@ export function generateHtml(cardHTML, totalStr, steamId, steamName, playerAvata
         }
         .header-card .subtitle {
           font-size: 16px;
-          color: ${current[1]};
+          color: ${fontColor};
         }
         .header-card .last-logoff {
           font-size: 14px;
-          color: ${current[1]};
+          color: ${fontColor};
           margin-top: 5px;
         }
         .avatar {
           width: 80px;
           height: 80px;
           border-radius: 50%;
-          border: 3px solid ${current[1]};
+          border: 3px solid ${fontColor};
           box-shadow: 0 0 10px rgba(0,0,0,0.5);
         }
         .grid-container {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+          grid-template-columns: repeat(${grid_columns}, minmax(250px, 1fr));
           gap: 20px;
         }
         .card-item {
