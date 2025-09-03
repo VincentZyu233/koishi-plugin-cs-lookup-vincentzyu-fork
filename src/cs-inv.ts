@@ -57,7 +57,7 @@ export function inv(ctx: Context, config: any) {
       }
 
       ctx.logger.info(`STEAMID = ${STEAMID}, USERID = ${USERID}`);
-      const waitMsgId = await session.send(`${h.quote(session.messageId)}调用cs-inv!, steamId = ${STEAMID}\n\t 获取inv+渲染中....`);
+      const waitMsgId = await session.send(`${h.quote(session.messageId)}正在获取steam库存... \n\t steamId = ${STEAMID}\n\t 渲染图片中....`);
 
       if (!isOnlyDigits(STEAMID)) {
         return "无效steamID, 若不知道steamID请使用指令 `getid Steam个人资料页链接` 获取";
@@ -106,7 +106,7 @@ export function inv(ctx: Context, config: any) {
         const totalStr = `总物品数: ${invData.total_inventory_count}`;
         const html = generateHtml(cardHtml, totalStr, STEAMID, playerPersonName, proxiedPlayerAvatarFullUrl, playerLastLogoffTimeStr, config.enableDarkTheme);
         const invPage = await ctx.puppeteer.page();
-        await invPage.setViewport({ width: 1280, height: 720 });
+        // await invPage.setViewport({ width: 1280, height: 720 });
         await invPage.setContent(html);
 
         const invImageRes = await invPage.screenshot({
