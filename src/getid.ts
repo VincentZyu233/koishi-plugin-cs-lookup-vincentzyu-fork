@@ -3,9 +3,13 @@ import { Config } from './index';
 import { } from 'koishi-plugin-umami-statistics-service'
 import { umami } from './index';
 
-export function apply(ctx: Context, config: Config) {
+export function apply(ctx: Context, config: any) {
   const umamiD = umami
-  ctx.command('getid <profLink:string>', '获取Steam ID', { authority: 0 })
+  ctx.command(
+    'getid <profLink:string>', 
+    '获取Steam ID. \n\t profLink的格式 比如: https://steamcommunity.com/id/VincentZyu/ \n\t 或者: https://steamcommunity.com/profiles/76561199321190157/' 
+    , { authority: 0 }
+  )
     .action(async ({ session }, profLink) => {
       if (config.data_collect) {
         ctx.umamiStatisticsService.send({
@@ -15,7 +19,7 @@ export function apply(ctx: Context, config: Config) {
           urlSearchParams: {
             args: session.argv.args?.join(', '),
             ...(session.argv.options || {}),
-          },
+          }, 
         })
       }
       if (!profLink.startsWith("https://steamcommunity.com/")) {

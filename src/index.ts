@@ -1,8 +1,9 @@
 import { Context, Schema } from 'koishi';
 import { inv } from './cs-inv';
 import { apply as getId } from './getid';
-import { bind } from './csbind';
+import { bind } from './cs-bind';
 import { } from 'koishi-plugin-umami-statistics-service';
+import { PROXY_PROTOCOL } from './types';
 
 export const name = 'cs-lookup';
 
@@ -10,47 +11,49 @@ export const umami: [string, string] = ["29272bd1-0f4c-4db8-ad22-bec20ee15810", 
 
 export const inject = ['puppeteer', 'database', 'umamiStatisticsService'];
 
-export interface Config {
-  data_collect: boolean,
-  useSteamAPI: boolean,
-  SteamWebAPIKey: string,
-  theme: boolean,
-  imageQuality: number,
-  proxyAddr: string,
-  userAgent: string,
-  cookie: string,
-}
-
-export const Config: Schema<Config> = Schema.intersect([
+export const Config = Schema.intersect([
   Schema.object({
     data_collect: Schema.boolean()
       .default(true)
       .description('是否允许匿名数据收集 隐私政策见上方链接'),
-    useSteamAPI: Schema.boolean()
-      .default(true)
-      .description("是否使用Steam官方API查询 (大陆地区实例可能存在网络不佳情况)"),
-    SteamWebAPIKey: Schema.string()
-      .description("Steam Web API Key from www.steamwebapi.com"),
   }).description("基础设置"),
   Schema.object({
-    theme: Schema.boolean()
-      .default(false)
-      .description('使用浅色主题'),
+    enableDarkTheme: Schema.boolean()
+      .default(true)
+      .description('使用深色主题'),
     imageQuality: Schema.number()
       .default(10)
       .min(0).max(100).step(0.1)
       .role('slider'),
   }).description("puppeteer网页截图配置"),
   Schema.object({
-    proxyAddr: Schema.string()
-      .default("socks5h://192.168.31.84:7891")
-      .description("格式是为以下三者之一(仅测试过clash-cli+socks5 awa): \n\t(1)socks5h://ip:port \n\t(2)http://ip:port \n\t(3)https://ip:port")
-      .role('link'),
+    // proxyAddr: Schema.string()
+    //   .default("socks5h://192.168.31.84:7891")
+    //   .description("格式是为以下三者之一(仅测试过clash-cli+socks5 awa): \n\t(1)socks5h://ip:port \n\t(2)http://ip:port \n\t(3)https://ip:port")
+    //   .role('link'),
+    proxy: Schema.object({
+      enabled: Schema.boolean()
+        .description('是否启用代理。')
+        .default(true),
+      protocol: Schema.union([
+        Schema.const(PROXY_PROTOCOL.HTTP).description("HTTP 代理"),
+        Schema.const(PROXY_PROTOCOL.HTTPS).description("HTTPS 代理"),
+        Schema.const(PROXY_PROTOCOL.SOCKS4).description("SOCKS4 代理"),
+        Schema.const(PROXY_PROTOCOL.SOCKS5).description("SOCKS5 代理"),
+        Schema.const(PROXY_PROTOCOL.SOCKS5H).description("SOCKS5h 代理 (支持远程DNS)"),
+      ]).role('radio').default(PROXY_PROTOCOL.SOCKS5H),
+      host: Schema.string()
+        .description('代理地址。')
+        .default('192.168.31.84'),
+      port: Schema.number()
+        .description('代理端口。')
+        .default(7891)
+    }),
     userAgent: Schema.string()
       .description("chrome打开chrome://version页面，找到用户代理")
       .role('textarea', { rows: [2, 10] }),
     cookie: Schema.string()
-      .description("浏览器访问https://steamcommunity.com/inventory/76561198307564265/730/2?l=schinese，然后F12打开Network，找到这个请求的cookie填入")
+      .description("浏览器访问steam库存链接，然后F12打开Network，找到这个请求的cookie填入。 链接地址：https://steamcommunity.com/inventory/76561198307564265/730/2?l=schinese，")
       .role('textarea', { rows: [2, 10] }),
   }).description("代理配置")
 ])
@@ -79,7 +82,7 @@ export interface CsLookup {
   platform: string
 }
 
-export function apply(ctx: Context, config: Config) {
+export function apply(ctx: Context, config: any) {
   ctx.model.extend('cs_lookup', {
     id: 'string',
     steamId: 'string',
