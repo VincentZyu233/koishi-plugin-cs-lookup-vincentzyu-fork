@@ -77,7 +77,7 @@ export function inv(ctx: Context, config: any) {
         const invRes = await axiosWithProxy.get(invUrl);
         const invData = invRes.data;
 
-        ctx.logger.info(`[debug] invData = ${JSON.stringify(invData).slice(0, 300)}[end]`);
+        ctx.logger.info(`[debug] invData = ${JSON.stringify(invData).slice(0, 1000)}[end]`);
 
         const itemMap = new Map<string, { count: number, imageUrl: string }>();
 
@@ -110,11 +110,8 @@ export function inv(ctx: Context, config: any) {
         await invPage.setContent(html);
         await invPage.waitForSelector('.card-item-image');
 
-        const bodyHandle = await invPage.$('body');
-        const { height } = await bodyHandle.boundingBox();
-        await bodyHandle.dispose(); // 释放句柄
 
-        await invPage.setViewport({ width: 1920, height: Math.ceil(height) + 200 }); // 加一点额外的填充，防止被截断
+        await invPage.setViewport({ width: 1920, height: itemMap.size * 50 }); // 加一点额外的填充，防止被截断
 
         const invImageRes = await invPage.screenshot({
           encoding: 'base64',
