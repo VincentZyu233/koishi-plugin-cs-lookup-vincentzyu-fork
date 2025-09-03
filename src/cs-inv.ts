@@ -123,7 +123,7 @@ export function inv(ctx: Context, config: any) {
           totalStr = `总物品数: ${invData.total_inventory_count}`;
           // 动态计算高度，每行4个卡片，每个卡片高度约300px，加上padding
           const rowCount = Math.ceil(itemMap.size / 4);
-          pageHeight = rowCount * 300 + 200;
+          pageHeight = rowCount * 45 + 90;
         }
 
         const html = generateHtml(cardHtml, gridColumns, totalStr, STEAMID, playerPersonName, proxiedPlayerAvatarFullUrl, playerLastLogoffTimeStr, config.enableDarkTheme);
