@@ -64,6 +64,7 @@ export function inv(ctx: Context, config: any) {
       }
       const playerUrl = `https://us-cc.vincentzyu233.cn/fastapi_wrap/cs/player/${STEAMID}`;
       const invUrl = `https://us-cc.vincentzyu233.cn/fastapi_wrap/cs/inv/${STEAMID}`;
+      // const invUrl = `https://steamcommunity.com/inventory/${STEAMID}/730/2?l=schinese`
       const currentColorArr = config.enableDarkTheme ? dark : light;
 
 
@@ -123,7 +124,7 @@ export function inv(ctx: Context, config: any) {
           totalStr = `总物品数: ${invData.total_inventory_count}`;
           // 动态计算高度，每行4个卡片，每个卡片高度约300px，加上padding
           const rowCount = Math.ceil(itemMap.size / 4);
-          pageHeight = rowCount * 50 + 100;
+          pageHeight = rowCount * 65 + 130;
         }
 
         const html = generateHtml(cardHtml, gridColumns, totalStr, STEAMID, playerPersonName, proxiedPlayerAvatarFullUrl, playerLastLogoffTimeStr, config.enableDarkTheme);
@@ -168,10 +169,20 @@ export function inv(ctx: Context, config: any) {
         const playerLastLogoff = userRes?.data?.response?.players[0]?.lastlogoff;
         const playerLastLogoffTimeStr = (new Date(playerLastLogoff * 1000)).toLocaleString();
 
-        const html = generateHtml(cardHtml, 1, '总物品数: ??', STEAMID, playerPersonName, proxiedPlayerAvatarFullUrl, playerLastLogoffTimeStr, config.enableDarkTheme);
+        const invHtml = generateHtml(cardHtml, 1, '总物品数: ??', STEAMID, playerPersonName, proxiedPlayerAvatarFullUrl, playerLastLogoffTimeStr, config.enableDarkTheme);
         const invPage = await ctx.puppeteer.page();
-        await invPage.setContent(html);
-        await invPage.waitForSelector('.main-card');
+        // await invPage.setContent(invHtml);
+        await invPage.setContent(invHtml, {
+            waitUntil: ['domcontentloaded'] // 等待 DOM 树加载完毕
+        });
+
+        // await invPage.waitForSelector('.main-card');
+        await invPage.waitForFunction(() => {
+            const avatar = document.querySelector('.avatar') as HTMLImageElement;
+            
+            const allImages = Array.from(document.querySelectorAll('.card-item-image, .avatar'));
+            return allImages.every(img => (img as HTMLImageElement).complete);
+        }, { timeout: 15000 });
         await invPage.setViewport({ width: 1666, height: 500 }); // fixed height for error page
 
         const invImageRes = await invPage.screenshot({
@@ -336,7 +347,7 @@ export function generateHtml(cardHTML, grid_columns: number, totalStr, steamId, 
       <div class="container">
         <div class="main-card">
           <div class="header-card">
-            <img src="${playerAvatarUrl}" alt="Player Avatar" class="avatar">
+            <img src="${playerAvatarUrl}" alt="Player Avatar" class="avatar" id="avatar-image">
             <div>
               <h1>CS 库存查询 - ${steamName}</h1>
               <div class="subtitle">(${steamId})</div>

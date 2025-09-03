@@ -16,8 +16,10 @@ export const Config = Schema.intersect([
     data_collect: Schema.boolean()
       .default(true)
       .description('是否允许匿名数据收集 隐私政策见上方链接'),
-    SteamWebAPIKey: Schema.string()
+    steamWebApiKey: Schema.string()
       .description("Steam Web API Key from www.steamwebapi.com"),
+    steamCommunityApiKey: Schema.string()
+      .description("Steam Community API Key from www.steamcommunity.com"),
   }).description("基础设置"),
   Schema.object({
     enableDarkTheme: Schema.boolean()

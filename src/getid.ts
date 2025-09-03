@@ -25,7 +25,7 @@ export function apply(ctx: Context, config: any) {
       if (!profLink.startsWith("https://steamcommunity.com/")) {
         return '请输入正确的Steam个人资料链接';
       }
-      const profUrl = `https://www.steamwebapi.com/steam/api/profile?key=${config.SteamWebAPIKey}&id=${profLink}`;
+      const profUrl = `https://www.steamwebapi.com/steam/api/profile?key=${config.steamWebApiKey}&id=${profLink}`;
       const data = await ctx.http.get(profUrl);
       let result = '用户名: ' +
         data.personaname +
