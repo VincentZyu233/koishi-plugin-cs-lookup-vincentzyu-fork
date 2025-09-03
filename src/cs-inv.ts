@@ -79,39 +79,51 @@ export function inv(ctx: Context, config: any) {
 
         ctx.logger.info(`[debug] invData = ${JSON.stringify(invData).slice(0, 1000)}[end]`);
 
-        const itemMap = new Map<string, { count: number, imageUrl: string }>();
-
-        for (const item of invData.descriptions) {
-          const itemName = item.market_name;
-          const imageUrl = "https://community.cloudflare.steamstatic.com/economy/image/" + item.icon_url;
-          if (!itemMap.has(itemName)) {
-            itemMap.set(itemName, { count: 0, imageUrl: imageUrl });
-          }
-          let itemInfo = itemMap.get(itemName);
-          itemInfo.count += 1;
-        }
-
         let cardHtml = ``;
-        for (const [itemName, itemInfo] of itemMap.entries()) {
-          cardHtml += `
-            <div class="card-item">
-              <h2 class="card-item-title">${itemName}</h2>
-              <div class="card-image-container">
-                <img src="${itemInfo.imageUrl}" alt="${itemName}" class="card-item-image">
-              </div>
-            </div>
+        let totalStr = '';
+
+        if (!invData.descriptions || invData.descriptions.length === 0) {
+          // 如果没有库存，显示一个醒目的提示
+          totalStr = `总物品数: 0`;
+          cardHtml = `
+            <div style="text-align: center; padding: 50px; font-size: 24px; font-weight: bold; color: #ff0000; background-color: rgba(255, 255, 255, 0.15); border-radius: 20px;">该用户没有CS2库存</div>
           `;
+        } else {
+          // 否则，正常处理库存数据
+          const itemMap = new Map<string, { count: number, imageUrl: string }>();
+
+          for (const item of invData.descriptions) {
+            const itemName = item.market_name;
+            const imageUrl = "https://community.cloudflare.steamstatic.com/economy/image/" + item.icon_url;
+            if (!itemMap.has(itemName)) {
+              itemMap.set(itemName, { count: 0, imageUrl: imageUrl });
+            }
+            let itemInfo = itemMap.get(itemName);
+            itemInfo.count += 1;
+          }
+
+          for (const [itemName, itemInfo] of itemMap.entries()) {
+            cardHtml += `
+              <div class="card-item">
+                <h2 class="card-item-title">${itemName}</h2>
+                <div class="card-image-container">
+                  <img src="${itemInfo.imageUrl}" alt="${itemName}" class="card-item-image">
+                </div>
+              </div>
+            `;
+          }
+
+          totalStr = `总物品数: ${invData.total_inventory_count}`;
         }
 
-        const totalStr = `总物品数: ${invData.total_inventory_count}`;
         const html = generateHtml(cardHtml, totalStr, STEAMID, playerPersonName, proxiedPlayerAvatarFullUrl, playerLastLogoffTimeStr, config.enableDarkTheme);
         const invPage = await ctx.puppeteer.page();
-        // await invPage.setViewport({ width: 1920, height: 1080 });
         await invPage.setContent(html);
-        await invPage.waitForSelector('.card-item-image');
+        await invPage.waitForSelector('.main-card'); // 等待主卡片渲染完成
 
-
-        await invPage.setViewport({ width: 1920, height: itemMap.size * 50 }); // 加一点额外的填充，防止被截断
+        // 根据是否有库存来调整视口高度
+        const pageHeight = invData.descriptions && invData.descriptions.length > 0 ? invData.descriptions.length * 50 : 500;
+        await invPage.setViewport({ width: 1920, height: pageHeight });
 
         const invImageRes = await invPage.screenshot({
           encoding: 'base64',
@@ -124,15 +136,18 @@ export function inv(ctx: Context, config: any) {
         await session.send(`${h.quote(session.messageId)}查询结果:${h.image(invImageBase64)}`);
 
       } catch (e) {
-        ctx.logger('cs-lookup').error(e);
-        return "出现错误, 请检查该用户库存是否公开或者与SteamAPI的连接是否正常";
+        const errMsg = `出现错误, 请检查该用户库存是否公开或者与SteamAPI的连接是否正常. err = ${e}`;
+        ctx.logger.error(errMsg);
+        await session.send(`${h.quote(session.messageId)}${errMsg}`);
+        return;
+      } finally {
+        try {
+          await session.bot.deleteMessage(session.guildId, String(waitMsgId));
+        } catch (err) {
+          ctx.logger.info(`消息撤回失败，有可能是过太久了导致qq无法撤回。 err: ${err}`);
+        }
       }
 
-      try {
-        await session.bot.deleteMessage(session.guildId, String(waitMsgId));
-      } catch (err) {
-        ctx.logger.info(`消息撤回失败，有可能是过太久了导致qq无法撤回。 err: ${err}`);
-      }
     });
 }
 
