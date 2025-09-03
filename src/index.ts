@@ -27,6 +27,11 @@ export const Config = Schema.intersect([
       .role('slider'),
   }).description("puppeteer网页截图配置"),
   Schema.object({
+    enableRestServer: Schema.boolean()
+      .default(false)
+      .description('是否启用REST API服务器'),
+  }),
+  Schema.object({
     // proxyAddr: Schema.string()
     //   .default("socks5h://192.168.31.84:7891")
     //   .description("格式是为以下三者之一(仅测试过clash-cli+socks5 awa): \n\t(1)socks5h://ip:port \n\t(2)http://ip:port \n\t(3)https://ip:port")
@@ -56,6 +61,7 @@ export const Config = Schema.intersect([
       .description("浏览器访问steam库存链接，然后F12打开Network，找到这个请求的cookie填入。 链接地址：https://steamcommunity.com/inventory/76561198307564265/730/2?l=schinese，")
       .role('textarea', { rows: [2, 10] }),
   }).description("代理配置")
+
 ])
 
 

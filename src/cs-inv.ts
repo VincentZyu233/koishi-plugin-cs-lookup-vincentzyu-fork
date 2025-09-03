@@ -106,8 +106,16 @@ export function inv(ctx: Context, config: any) {
         const totalStr = `总物品数: ${invData.total_inventory_count}`;
         const html = generateHtml(cardHtml, totalStr, STEAMID, playerPersonName, proxiedPlayerAvatarFullUrl, playerLastLogoffTimeStr, config.enableDarkTheme);
         const invPage = await ctx.puppeteer.page();
-        // await invPage.setViewport({ width: 1280, height: 720 });
+        await invPage.setViewport({ width: 1920, height: 1080 });
         await invPage.setContent(html);
+        await invPage.waitForSelector('.card-item-image');
+
+        const bodyHandle = await invPage.$('body');
+        const { height } = await bodyHandle.boundingBox();
+        await bodyHandle.dispose(); // 释放句柄
+
+        await invPage.setViewport({ width: 1920, height: Math.ceil(height) + 40 }); // 加一点额外的填充，防止被截断
+
 
         const invImageRes = await invPage.screenshot({
           encoding: 'base64',
