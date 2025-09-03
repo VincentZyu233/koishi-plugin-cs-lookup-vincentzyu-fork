@@ -24,6 +24,8 @@ export async function bind(ctx: Context) {
         USERID = session.userId;
       }
 
+      const userObj = await session.bot.getUser(USERID, session.channelId);
+
       ctx.logger.info(`STEAMID = ${STEAMID}, USERID = ${USERID}`);
       // return;
 
@@ -33,7 +35,7 @@ export async function bind(ctx: Context) {
 
       const res = await ctx.database.get('cs_lookup', { userid: USERID, platform: PLATFORM })
       if (res.length) {
-        session.send(`用户 ${session.username}(${USERID}-${PLATFORM}) 已绑定 SteamID ${STEAMID}, \n\t 回复 ok 以进行替换，或者回复 cancel 取消替换`)
+        session.send(`用户 ${userObj.name}(${USERID}-${PLATFORM}) 已绑定 SteamID ${STEAMID}, \n\t 回复 ok 以进行替换，或者回复 cancel 取消替换`)
         const response = await session.prompt()
         if (response === 'cancel') {
           return `已取消替换 SteamID`
