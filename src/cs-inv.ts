@@ -145,15 +145,15 @@ export function inv(ctx: Context, config: any) {
 
       } catch (e) {
         let cardHtml = '';
-        let errorMessage = "发生未知错误";
 
+        let errorMessage = "发生未知错误";
         if (e.response && e.response.data && e.response.data.detail) {
           const detail = e.response.data.detail;
           if (detail.includes('Unauthorized')) {
-            errorMessage = `获取CS2库存失败，可能是对方未公开库存。`;
+            errorMessage = `\n\t获取CS2库存失败，可能是对方未公开库存。`;
           }
-          errorMessage += `<br/><br/>**原文:** ${detail}`;
         }
+        errorMessage += `err = ${JSON.stringify(errorMessage)}`;
         
         cardHtml = `
             <div style="text-align: center; padding: 50px; font-size: 20px; font-weight: bold; color: ${currentColorArr[1]}; background-color: rgba(255, 255, 255, 0.15); border-radius: 20px;">
